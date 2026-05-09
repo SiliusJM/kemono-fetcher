@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal enabledelayedexpansion
 title kemono-fetcher
 chcp 65001 >nul 2>&1
@@ -10,9 +10,7 @@ echo    https://github.com/SILIUS/kemono-fetcher
 echo  ==================================================
 echo.
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 1 — Verificar Python
-:: ─────────────────────────────────────────────────────────────────────────────
+:: PASO 1 - Verificar Python
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
@@ -32,9 +30,7 @@ if %errorlevel% neq 0 (
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PYVER=%%v
 echo [OK] %PYVER% detectado
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 2 — pip disponible?
-:: ─────────────────────────────────────────────────────────────────────────────
+:: PASO 2 - pip disponible?
 python -m pip --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [*] pip no encontrado, intentando instalarlo...
@@ -46,15 +42,12 @@ if %errorlevel% neq 0 (
     )
 )
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 3 — Instalar dependencias desde requirements_galeria.txt
-:: ─────────────────────────────────────────────────────────────────────────────
+:: PASO 3 - Instalar dependencias
 echo.
-echo [*] Instalando dependencias (puede tardar la primera vez)...
+echo [*] Verificando dependencias...
 
 if not exist "%~dp0requirements_galeria.txt" (
     echo [ERROR] No se encontro requirements_galeria.txt junto al .bat
-    echo         Asegurate de clonar o descargar todos los archivos del repositorio.
     pause
     exit /b 1
 )
@@ -62,19 +55,14 @@ if not exist "%~dp0requirements_galeria.txt" (
 python -m pip install -q -r "%~dp0requirements_galeria.txt"
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Fallo al instalar dependencias.
-    echo         Verifica tu conexion a internet e intenta de nuevo.
-    echo         Tambien puedes instalar manualmente:
-    echo           pip install -r requirements_galeria.txt
+    echo [ERROR] Fallo al instalar dependencias. Verifica tu conexion a internet.
     echo.
     pause
     exit /b 1
 )
-echo [OK] Dependencias instaladas
+echo [OK] Dependencias listas
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 4 — Instalar Chromium para Playwright
-:: ─────────────────────────────────────────────────────────────────────────────
+:: PASO 4 - Chromium para Playwright
 echo.
 echo [*] Verificando Chromium (navegador para Playwright)...
 python -m playwright install chromium >nul 2>&1
@@ -86,94 +74,94 @@ if %errorlevel% neq 0 (
 )
 echo [OK] Chromium listo
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 5 — Verificar que kemono_galeria.py existe
-:: ─────────────────────────────────────────────────────────────────────────────
+:: PASO 5 - Verificar kemono_galeria.py
 if not exist "%~dp0kemono_galeria.py" (
     echo.
     echo [ERROR] No se encontro kemono_galeria.py junto al .bat
-    echo         Asegurate de clonar o descargar todos los archivos del repositorio.
     echo.
     pause
     exit /b 1
 )
-
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 6 — Obtener URL del post
-:: ─────────────────────────────────────────────────────────────────────────────
-echo.
-if "%~1"=="" (
-    echo  Pega la URL del post de Kemono o Coomer y presiona Enter.
-    echo  Ejemplo: https://kemono.cr/patreon/user/101779509/post/109629764
-    echo.
-    set /p POST_URL="  URL: "
-    echo.
-) else (
-    set POST_URL=%~1
-)
-
-if "!POST_URL!"=="" (
-    echo [ERROR] No ingresaste una URL.
-    pause
-    exit /b 1
-)
-
-:: Validacion basica de URL
-echo !POST_URL! | findstr /i "kemono.cr coomer.cr" >nul
-if %errorlevel% neq 0 (
-    echo [WARN] La URL no parece ser de kemono.cr ni coomer.cr
-    echo        Continuando de todas formas...
-    echo.
-)
-
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 7 — Nombre personalizado del ZIP (opcional)
-:: ─────────────────────────────────────────────────────────────────────────────
-set ZIP_NAME_ARG=
-if "%~2"=="" (
-    echo  [Opcional] Nombre personalizado para el ZIP de salida.
-    echo  Deja vacio para usar el nombre automatico ^(ID del post^).
-    echo  Ejemplo: Zenith Greyrat [XTRAS] ^(Patreon^)
-    echo.
-    set /p CUSTOM_ZIP="  Nombre del ZIP (Enter para omitir): "
-    if not "!CUSTOM_ZIP!"=="" (
-        set ZIP_NAME_ARG=--zip-name "!CUSTOM_ZIP!"
-    )
-) else (
-    set ZIP_NAME_ARG=--zip-name "%~2"
-)
-
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 8 — Ejecutar la herramienta
-:: ─────────────────────────────────────────────────────────────────────────────
-echo.
-echo  Iniciando recuperacion...
-echo  URL: !POST_URL!
-if not "!ZIP_NAME_ARG!"=="" echo  ZIP: !CUSTOM_ZIP!
-echo.
 
 cd /d "%~dp0"
-python kemono_galeria.py "!POST_URL!" !ZIP_NAME_ARG! %3 %4 %5
+
+:: BUCLE PRINCIPAL
+:LOOP
+
+echo.
+echo  -------------------------------------------------------
+echo   Pega la URL del post de Kemono o Coomer y presiona Enter.
+echo   Ejemplo: https://kemono.cr/patreon/user/101779509/post/109629764
+echo.
+set POST_URL=
+set /p POST_URL="  URL: "
+echo.
+
+if "!POST_URL!"=="" (
+    echo [WARN] No ingresaste ninguna URL. Intenta de nuevo.
+    goto LOOP
+)
+
+echo !POST_URL! | findstr /i "kemono.cr coomer.cr" >nul
+if %errorlevel% neq 0 (
+    echo [WARN] La URL no parece ser de kemono.cr ni coomer.cr. Continuando...
+    echo.
+)
+
+:: ZIP - preguntar al usuario
+echo  [Opcional] Nombre del ZIP de salida.
+echo   - Deja vacio para nombre automatico.
+echo   - Escribe NO si NO quieres ZIP (ya tienes las imagenes).
+echo   - Escribe el nombre: Ej.  Zenith Greyrat [XTRAS] (Patreon)
+echo.
+set CUSTOM_ZIP=
+set ZIP_NAME_ARG=
+set NO_ZIP_ARG=
+set /p CUSTOM_ZIP="  Nombre del ZIP [Enter/NO/nombre]: "
+echo.
+
+if /i "!CUSTOM_ZIP!"=="NO" (
+    set NO_ZIP_ARG=--no-zip
+) else if not "!CUSTOM_ZIP!"=="" (
+    set ZIP_NAME_ARG=--zip-name "!CUSTOM_ZIP!"
+)
+
+:: Ejecutar
+echo.
+echo  Iniciando descarga...
+echo  URL: !POST_URL!
+echo.
+
+python kemono_galeria.py "!POST_URL!" !ZIP_NAME_ARG! !NO_ZIP_ARG!
 set EXIT_CODE=%errorlevel%
 
 echo.
 if %EXIT_CODE% equ 0 (
     echo [OK] Proceso completado sin errores.
 ) else (
-    echo [WARN] El proceso termino con codigo de salida %EXIT_CODE%.
-    echo        Revisa los mensajes anteriores para mas detalles.
+    echo [WARN] El proceso termino con codigo %EXIT_CODE%. Revisa los mensajes anteriores.
 )
 
-:: ─────────────────────────────────────────────────────────────────────────────
-:: PASO 9 — Abrir carpeta de resultados
-:: ─────────────────────────────────────────────────────────────────────────────
-if exist "%~dp0kemono_galeria_output" (
-    echo.
-    echo [*] Abriendo carpeta de resultados...
-    explorer "%~dp0kemono_galeria_output"
-)
-
+:: Continuar o salir
 echo.
-echo Presiona cualquier tecla para salir...
-pause >nul
+echo  -------------------------------------------------------
+echo   Que deseas hacer?
+echo     1  -  Descargar otra URL
+echo     2  -  Salir
+echo  -------------------------------------------------------
+echo.
+set OPCION=
+set /p OPCION="  Opcion [1/2]: "
+
+if "!OPCION!"=="1" goto LOOP
+if "!OPCION!"=="2" goto FIN
+
+echo [WARN] Opcion invalida. Escribe 1 o 2.
+timeout /t 2 >nul
+goto LOOP
+
+:FIN
+echo.
+echo  Hasta luego!
+echo.
 endlocal

@@ -67,8 +67,9 @@ except ImportError:
 # CONSTANTES & CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════════════════════════
 
-VERSION      = "2.0"
-OUTPUT_DIR   = Path("kemono_galeria_output")
+VERSION           = "2.0"
+OUTPUT_DIR        = Path("kemono_galeria_output")
+NETWORK_CACHE_TTL = 3600  # segundos — reutilizar análisis de red dentro de 1 hora
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -1053,10 +1054,13 @@ class Exporter:
             ],
         }
 
-        with open(self.output_dir / "metadata.json", "w", encoding="utf-8") as f:
+        cache_dir = self.output_dir / "_cache"
+        cache_dir.mkdir(exist_ok=True)
+
+        with open(cache_dir / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
-        with open(self.output_dir / "fullres_urls.txt", "w", encoding="utf-8") as f:
+        with open(cache_dir / "fullres_urls.txt", "w", encoding="utf-8") as f:
             for i in items:
                 if i.url_fullres:
                     f.write(f"{i.url_fullres}\n")
@@ -1066,7 +1070,7 @@ class Exporter:
                 for i in failed:
                     f.write(f"{i.hash}\t{i.dl_error or ''}\t{i.url_fullres or ''}\n")
 
-        exported = ["metadata.json", "fullres_urls.txt"]
+        exported = ["_cache/metadata.json", "_cache/fullres_urls.txt"]
         if failed:
             exported.append(f"failed.txt ({len(failed)} errores)")
         con.print(f"[green][OK] {', '.join(exported)}[/green]")
@@ -1244,7 +1248,7 @@ def print_verdict(
         )
 
     # Listar solo archivos relevantes para el usuario
-    HIDDEN = {"metadata.json", "fullres_urls.txt", "extracted_urls.json"}
+    HIDDEN = {"_cache"}  # carpeta de archivos técnicos — ocultar del resumen
     con.print()
     con.print("[bold]Archivos generados:[/bold]")
     for fp in sorted(output_dir.rglob("*")):
@@ -1303,11 +1307,51 @@ async def _main(args: argparse.Namespace) -> None:
     con.print(f"  Concurrencia: {args.concurrency}")
     con.print()
 
-    # ── FASE 1: Análisis de red ───────────────────────────────────────────────
+    # ── FASE 1: Análisis de red (caché 1h) ──────────────────────────────────────
     net = NetworkAnalyzer()
+    net_cache_file = OUTPUT_DIR / "network_cache.json"
+    _net_from_cache = False
+
     if not args.skip_network:
-        extra = [urlparse(post_url).netloc]
-        net.run_analysis(extra_hosts=extra)
+        # Reutilizar cache si tiene menos de NETWORK_CACHE_TTL segundos
+        if net_cache_file.exists():
+            try:
+                with open(net_cache_file, encoding="utf-8") as _f:
+                    _nc = json.load(_f)
+                if time.time() - _nc.get("timestamp", 0) < NETWORK_CACHE_TTL:
+                    net.results = [
+                        NetworkResult(**{k: v for k, v in r.items() if k != "status"})
+                        for r in _nc["results"]
+                    ]
+                    for r in net.results:
+                        if r.tcp != "OK":
+                            net.mark_dead(r.host)
+                    _net_from_cache = True
+                    con.rule("[bold cyan]FASE 1 — Análisis de Red[/bold cyan]")
+                    alive = sum(1 for r in net.results if r.tcp == "OK")
+                    con.print(f"[dim][CACHE] Análisis de red reutilizado (< 1h)  "
+                              f"Hosts vivos: {alive}/{len(net.results)}[/dim]\n")
+            except Exception:
+                pass  # cache corrupta → re-analizar
+
+        if not _net_from_cache:
+            extra = [urlparse(post_url).netloc]
+            net.run_analysis(extra_hosts=extra)
+            # Guardar cache
+            net_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(net_cache_file, "w", encoding="utf-8") as _f:
+                    json.dump({
+                        "timestamp": time.time(),
+                        "results": [
+                            {"host": r.host, "port": r.port, "dns": r.dns,
+                             "tcp": r.tcp, "tls": r.tls, "http": r.http,
+                             "latency": r.latency, "error": r.error}
+                            for r in net.results
+                        ]
+                    }, _f, ensure_ascii=False)
+            except Exception:
+                pass
     else:
         con.print("[dim][SKIP] Análisis de red (--skip-network)[/dim]\n")
 
@@ -1315,17 +1359,20 @@ async def _main(args: argparse.Namespace) -> None:
     all_urls   : List[str] = []
     dom_data   : dict      = {}
     post_title : str       = ""
-    cache_file = output_dir / "extracted_urls.json"
+    cache_dir  = output_dir / "_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / "extracted_urls.json"
 
     con.rule("[bold cyan]FASE 2 — Extracción Playwright[/bold cyan]")
 
-    if args.skip_playwright and cache_file.exists():
+    # Si ya existe cache del post (mismo post = no re-extraer)
+    if cache_file.exists():
         with open(cache_file, encoding="utf-8") as f:
             cached = json.load(f)
         all_urls   = cached.get("urls", [])
         post_title = cached.get("post_title", "")
         dom_data   = cached.get("dom", {})
-        con.print(f"[green][CACHE] {len(all_urls)} URLs cargadas.[/green]")
+        con.print(f"[dim][CACHE] Post ya extraído — {len(all_urls)} URLs reutilizadas.[/dim]")
     else:
         extractor = PlaywrightExtractor(output_dir)
         try:
@@ -1387,7 +1434,11 @@ async def _main(args: argparse.Namespace) -> None:
 
     # ── FASE 6: ZIP ───────────────────────────────────────────────────────────
     con.rule("[bold cyan]FASE 6 — ZIP[/bold cyan]")
-    zip_path = ZipBuilder(output_dir).build(items, post_url, post_title, args.zip_name)
+    if args.no_zip:
+        zip_path = None
+        con.print("[dim][SKIP] ZIP omitido (--no-zip)[/dim]")
+    else:
+        zip_path = ZipBuilder(output_dir).build(items, post_url, post_title, args.zip_name)
 
     # ── FASE 7: Veredicto ─────────────────────────────────────────────────────
     con.rule("[bold]FASE 7 — Veredicto[/bold]")
@@ -1439,6 +1490,9 @@ Ejemplos:
         help=("Nombre personalizado del ZIP de salida. "
               "Ej: \"Zenith Greyrat [XTRAS] (Patreon)\" "
               "(caracteres especiales se sanean automáticamente)"))
+    parser.add_argument("--no-zip",
+        action="store_true",
+        help="No crear archivo ZIP (conservar solo las imágenes)")
 
     args = parser.parse_args()
     asyncio.run(_main(args))

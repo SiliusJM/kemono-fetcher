@@ -54,7 +54,7 @@ python kemono_galeria.py "<url>" --skip-network      # omitir análisis TCP/DNS 
 | `--output CARPETA` | Carpeta donde guardar todo | `kemono_galeria_output` |
 | `--zip-name NOMBRE` | Nombre personalizado del ZIP de salida | auto (usa ID del post) |
 | `--concurrency N` | Descargas simultáneas | `6` |
-| `--skip-playwright` | Reutilizar `extracted_urls.json` si existe (omite el paso de navegador) | — |
+| `--no-zip` | No crear archivo ZIP (mantener solo las imágenes) | — |
 | `--skip-network` | Omitir análisis TCP/DNS (más rápido, sin diagnóstico) | — |
 | `--continue-on-error` | Continuar aunque Playwright falle | — |
 
@@ -64,21 +64,24 @@ python kemono_galeria.py "<url>" --skip-network      # omitir análisis TCP/DNS 
 
 Después de ejecutar el tool, encontrarás esto en la carpeta de salida:
 
+Cada descarga crea su propia subcarpeta basada en el post ID:
+
 ```
 kemono_galeria_output/
-├── images/
-│   ├── 0001.jpg
-│   ├── 0002.jpg
-│   └── ...
-├── recovered_SERVICE_UID_PID.zip   ← ZIP con todas las imágenes + manifest
-├── metadata.json                   ← Info completa del post y estado de cada archivo
-├── images_urls.txt                 ← URLs full-res y thumbnails para referencia
-├── fullres_urls.txt                ← Solo URLs full-res (para reintentar más tarde)
-├── failed.txt                      ← Archivos que fallaron (vacío si todo OK)
-├── extracted_urls.json             ← Cache de la extracción Playwright
-├── network_log.har                 ← Log HAR de red del navegador
-└── screenshot.png                  ← Captura completa de la página
+└── patreon_142198624/              ← subcarpeta por post (service_postid)
+    ├── images/
+    │   ├── 0001.jpg
+    │   ├── 0002.png
+    │   └── ...
+    ├── recovered_patreon_..._142198624.zip   ← ZIP con imágenes + manifest
+    ├── failed.txt                            ← Solo se crea si hay errores
+    └── _cache/                               ← Archivos técnicos (ignorar)
+        ├── metadata.json
+        ├── fullres_urls.txt
+        └── extracted_urls.json
 ```
+
+> Descargar posts diferentes no mezcla sus imágenes.
 
 ---
 
@@ -89,10 +92,20 @@ FASE 1  →  Análisis de red (DNS, TCP, TLS, HTTP de todos los hosts de Kemono)
 FASE 2  →  Extracción Playwright (navega el post con Chromium real, captura toda la red)
 FASE 3  →  Clasificación y validación (full-res vs thumbnail, HEAD request por cada URL)
 FASE 4  →  Descarga (async, retries con backoff, resume parcial, fallback automático)
-FASE 5  →  Exportar (metadata.json, fullres_urls.txt, failed.txt, images_urls.txt)
+FASE 5  →  Exportar (metadata.json, fullres_urls.txt, failed.txt)
 FASE 6  →  ZIP (empaqueta todo con manifest.json interno)
 FASE 7  →  Veredicto (tabla de estado + diagnóstico + próximos pasos)
 ```
+
+### ⏱️ Tiempos reales (medidos en Windows)
+
+| Situación | Tiempo aproximado |
+|-----------|-------------------|
+| Primera descarga de un post nuevo | ~27 segundos |
+| Mismo autor, post diferente (red cacheada 1h) | ~15 segundos |
+| Cualquier post, red ya cacheada | < 32 segundos |
+
+> El análisis de red (Fase 1) se guarda en caché 1 hora. Playwright (Fase 2) también se cachea por post — si vuelves a descargar el mismo post, se salta directo a la descarga.
 
 ### Verdicts posibles
 
