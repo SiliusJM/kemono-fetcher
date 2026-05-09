@@ -1274,10 +1274,27 @@ def print_verdict(
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def _main(args: argparse.Namespace) -> None:
-    post_url   = args.url.strip()
-    output_dir = Path(args.output)
-    img_dir    = output_dir / "images"
-    output_dir.mkdir(exist_ok=True)
+    post_url = args.url.strip()
+
+    # Validar URL y extraer partes antes de crear carpetas
+    service, uid, pid = parse_post_url(post_url)
+    if uid == "0":
+        con.rule(f"[bold]Kemono / Coomer Gallery Recovery  v{VERSION}[/bold]")
+        con.print(
+            "[red][ERROR] URL inválida.\n"
+            "  Formato esperado: https://kemono.cr/SERVICE/user/UID/post/PID[/red]"
+        )
+        sys.exit(1)
+
+    # Si el usuario no especificó --output, crear subcarpeta propia por post
+    # para que cada descarga quede aislada: kemono_galeria_output/{service}_{pid}/
+    if args.output == str(OUTPUT_DIR):
+        output_dir = OUTPUT_DIR / f"{service}_{pid}"
+    else:
+        output_dir = Path(args.output)
+
+    img_dir = output_dir / "images"
+    output_dir.mkdir(parents=True, exist_ok=True)
     img_dir.mkdir(exist_ok=True)
 
     con.rule(f"[bold]Kemono / Coomer Gallery Recovery  v{VERSION}[/bold]")
@@ -1285,14 +1302,6 @@ async def _main(args: argparse.Namespace) -> None:
     con.print(f"  Salida      : [cyan]{output_dir}[/cyan]")
     con.print(f"  Concurrencia: {args.concurrency}")
     con.print()
-
-    service, uid, pid = parse_post_url(post_url)
-    if uid == "0":
-        con.print(
-            "[red][ERROR] URL inválida.\n"
-            "  Formato esperado: https://kemono.cr/SERVICE/user/UID/post/PID[/red]"
-        )
-        sys.exit(1)
 
     # ── FASE 1: Análisis de red ───────────────────────────────────────────────
     net = NetworkAnalyzer()
