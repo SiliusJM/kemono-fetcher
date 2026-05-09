@@ -350,24 +350,12 @@ class PlaywrightExtractor:
         base_host = urlparse(post_url).netloc  # kemono.cr o coomer.cr
 
         async with async_playwright() as pw:
-            browser  = await pw.chromium.launch(headless=True)
-            har_path = str(self.output_dir / "network_log.har")
+            browser = await pw.chromium.launch(headless=True)
 
-            # Intentar grabar HAR (no disponible en todas las versiones)
-            ctx = None
-            for opts in [
-                {"record_har_path": har_path, "record_har_content": "omit"},
-                {},
-            ]:
-                try:
-                    ctx = await browser.new_context(
-                        user_agent=UA,
-                        viewport={"width": 1920, "height": 1080},
-                        **opts,
-                    )
-                    break
-                except Exception:
-                    pass
+            ctx = await browser.new_context(
+                user_agent=UA,
+                viewport={"width": 1920, "height": 1080},
+            )
 
             page = await ctx.new_page()
 
@@ -422,14 +410,6 @@ class PlaywrightExtractor:
                 await page.evaluate("window.scrollTo(0, 0)")
                 await asyncio.sleep(1.5)
                 await page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
-                pass
-
-            # ── Screenshot ────────────────────────────────────────────────────
-            try:
-                ss_path = self.output_dir / "screenshot.png"
-                await page.screenshot(path=str(ss_path), full_page=True)
-                con.log(f"[green][OK] screenshot.png ({ss_path.stat().st_size // 1024}KB)[/green]")
             except Exception:
                 pass
 
@@ -616,19 +596,6 @@ class PlaywrightExtractor:
                 raw = sd["_raw"]
                 for p in re.findall(r'["\']?(/data/[^"\'>\s]{10,})["\']?', raw):
                     all_urls.add(f"{base_url}{p}")
-
-        # HAR
-        har_p = self.output_dir / "network_log.har"
-        if har_p.exists():
-            try:
-                with open(har_p, encoding="utf-8", errors="ignore") as f:
-                    har = json.load(f)
-                for entry in har.get("log", {}).get("entries", []):
-                    u = entry.get("request", {}).get("url", "")
-                    if u and is_media_url(u):
-                        all_urls.add(u)
-            except Exception:
-                pass
 
         post_title = dom.get("post_title") or dom.get("page_title") or ""
         con.log(
@@ -1089,30 +1056,20 @@ class Exporter:
         with open(self.output_dir / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
-        with open(self.output_dir / "images_urls.txt", "w", encoding="utf-8") as f:
-            f.write(f"# {post_url}\n# {datetime.now().isoformat()}\n\n")
-            f.write("## FULL-RES (derivado — funciona cuando n1-n4 vuelven)\n")
-            for i in items:
-                if i.url_fullres:
-                    f.write(f"{i.url_fullres}\n")
-            f.write("\n## THUMBNAILS (img.kemono.cr — vivos ahora)\n")
-            for i in items:
-                if i.url_thumb:
-                    f.write(f"{i.url_thumb}\n")
-
         with open(self.output_dir / "fullres_urls.txt", "w", encoding="utf-8") as f:
             for i in items:
                 if i.url_fullres:
                     f.write(f"{i.url_fullres}\n")
 
-        with open(self.output_dir / "failed.txt", "w", encoding="utf-8") as f:
-            for i in failed:
-                f.write(f"{i.hash}\t{i.dl_error or ''}\t{i.url_fullres or ''}\n")
+        if failed:
+            with open(self.output_dir / "failed.txt", "w", encoding="utf-8") as f:
+                for i in failed:
+                    f.write(f"{i.hash}\t{i.dl_error or ''}\t{i.url_fullres or ''}\n")
 
-        con.print(
-            "[green][OK] metadata.json  images_urls.txt  "
-            "fullres_urls.txt  failed.txt[/green]"
-        )
+        exported = ["metadata.json", "fullres_urls.txt"]
+        if failed:
+            exported.append(f"failed.txt ({len(failed)} errores)")
+        con.print(f"[green][OK] {', '.join(exported)}[/green]")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1286,15 +1243,28 @@ def print_verdict(
             f"--skip-playwright[/cyan]"
         )
 
-    # Listar archivos generados
+    # Listar solo archivos relevantes para el usuario
+    HIDDEN = {"metadata.json", "fullres_urls.txt", "extracted_urls.json"}
     con.print()
     con.print("[bold]Archivos generados:[/bold]")
     for fp in sorted(output_dir.rglob("*")):
-        if fp.is_file():
-            rel = fp.relative_to(output_dir)
-            sz  = fp.stat().st_size
-            sz_s = f"{sz // 1048576}MB" if sz > 1048576 else f"{sz // 1024}KB"
-            con.print(f"  [dim]{str(rel):<52}[/dim]  {sz_s:>8}")
+        if not fp.is_file():
+            continue
+        if fp.name in HIDDEN:
+            continue
+        if fp.parent.name == "images":
+            continue  # mostrar solo el folder, no cada imagen
+        rel  = fp.relative_to(output_dir)
+        sz   = fp.stat().st_size
+        sz_s = f"{sz // 1048576}MB" if sz > 1048576 else f"{sz // 1024}KB"
+        con.print(f"  [dim]{str(rel):<52}[/dim]  {sz_s:>8}")
+    # Mostrar el folder images/ como resumen
+    img_dir = output_dir / "images"
+    if img_dir.exists():
+        imgs   = list(img_dir.iterdir())
+        total  = sum(f.stat().st_size for f in imgs if f.is_file())
+        sz_s   = f"{total // 1048576}MB" if total > 1048576 else f"{total // 1024}KB"
+        con.print(f"  [dim]{'images/ (' + str(len(imgs)) + ' archivos)':<52}[/dim]  {sz_s:>8}")
 
     return v
 
@@ -1413,6 +1383,13 @@ async def _main(args: argparse.Namespace) -> None:
     # ── FASE 7: Veredicto ─────────────────────────────────────────────────────
     con.rule("[bold]FASE 7 — Veredicto[/bold]")
     print_verdict(items, net.results, post_title, zip_path, output_dir)
+
+    # ── Abrir carpeta de salida automáticamente (Windows) ─────────────────────
+    if sys.platform == "win32":
+        try:
+            os.startfile(str(output_dir.resolve()))
+        except Exception:
+            pass
 
 
 def main() -> None:
