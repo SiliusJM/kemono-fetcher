@@ -6,7 +6,23 @@ Recupera imágenes y vídeos de posts aunque el almacenamiento principal del ser
 
 ---
 
-## 📋 Requisitos
+## � Capturas de pantalla
+
+**Pantalla de inicio — el .bat te pide la URL y opciones:**
+
+![Pantalla de inicio](assets/inicio.png)
+
+**Fases en ejecución — descarga en curso con barra de progreso:**
+
+![Descargando imágenes](assets/descargando-imagenes.png)
+
+**Resultado final — carpeta con las imágenes descargadas:**
+
+![Folder de imágenes descargadas](assets/folder-imagenes-descargadas.png)
+
+---
+
+## �📋 Requisitos
 
 | Requisito | Versión mínima |
 |-----------|----------------|
@@ -23,7 +39,13 @@ Recupera imágenes y vídeos de posts aunque el almacenamiento principal del ser
 ```
 kemono_launch.bat
 ```
-El `.bat` instala dependencias, instala el navegador Chromium y te pide la URL del post.
+El `.bat` instala dependencias, instala el navegador Chromium y entra en un **bucle de descarga**:
+
+1. Pega la URL del post
+2. **`Enter`** = sin ZIP (solo carpeta de imágenes) — o escribe un nombre para crear el ZIP
+3. Espera ~27 segundos (primera vez) o ~15 segundos (misma sesión)
+4. Se abre la carpeta automáticamente
+5. **`Enter`** = descargar otra URL — `2` = salir
 
 ### Opción B — Línea de comandos
 ```bash
@@ -54,7 +76,7 @@ python kemono_galeria.py "<url>" --skip-network      # omitir análisis TCP/DNS 
 | `--output CARPETA` | Carpeta donde guardar todo | `kemono_galeria_output` |
 | `--zip-name NOMBRE` | Nombre personalizado del ZIP de salida | auto (usa ID del post) |
 | `--concurrency N` | Descargas simultáneas | `6` |
-| `--no-zip` | No crear archivo ZIP (mantener solo las imágenes) | — |
+| `--no-zip` | No crear archivo ZIP (en el `.bat` equivale a pulsar Enter en la pregunta del ZIP) | — |
 | `--skip-network` | Omitir análisis TCP/DNS (más rápido, sin diagnóstico) | — |
 | `--continue-on-error` | Continuar aunque Playwright falle | — |
 

@@ -109,20 +109,19 @@ if %errorlevel% neq 0 (
 )
 
 :: ZIP - preguntar al usuario
-echo  [Opcional] Nombre del ZIP de salida.
-echo   - Deja vacio para nombre automatico.
-echo   - Escribe NO si NO quieres ZIP (ya tienes las imagenes).
-echo   - O escribe el nombre: Ej.  Zenith Greyrat [XTRAS] (Patreon)
+echo  [Opcional] ZIP de salida.
+echo   Enter       = sin ZIP (solo imagenes en carpeta)
+echo   nombre      = crea ZIP con ese nombre. Ej: Zenith Greyrat (Patreon)
 echo.
 set CUSTOM_ZIP=
 set ZIP_NAME_ARG=
 set NO_ZIP_ARG=
-set /p CUSTOM_ZIP="  Nombre del ZIP [Enter/NO/nombre]: "
+set /p CUSTOM_ZIP="  Nombre del ZIP (Enter para omitir): "
 echo.
 
-if /i "!CUSTOM_ZIP!"=="NO" (
+if "!CUSTOM_ZIP!"=="" (
     set NO_ZIP_ARG=--no-zip
-) else if not "!CUSTOM_ZIP!"=="" (
+) else (
     set ZIP_NAME_ARG=--zip-name "!CUSTOM_ZIP!"
 )
 
@@ -146,17 +145,18 @@ if %EXIT_CODE% equ 0 (
 echo.
 echo  -------------------------------------------------------
 echo   Que deseas hacer?
-echo     1  -  Descargar otra URL
-echo     2  -  Salir
+echo     Enter  -  Descargar otra URL
+echo     2      -  Salir
 echo  -------------------------------------------------------
 echo.
 set OPCION=
-set /p OPCION="  Opcion [1/2]: "
+set /p OPCION="  Opcion (Enter / 2): "
 
+if "!OPCION!"=="" goto LOOP
 if "!OPCION!"=="1" goto LOOP
 if "!OPCION!"=="2" goto FIN
 
-echo [WARN] Opcion invalida. Escribe 1 o 2.
+echo [WARN] Opcion invalida. Presiona Enter para continuar o 2 para salir.
 timeout /t 2 >nul
 goto LOOP
 
