@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal enabledelayedexpansion
 title kemono-fetcher
 chcp 65001 >nul 2>&1
@@ -6,7 +6,7 @@ chcp 65001 >nul 2>&1
 echo.
 echo  ==================================================
 echo    kemono-fetcher  ^|  Gallery Recovery Tool
-echo    https://github.com/SILIUS/kemono-fetcher
+echo    https://github.com/SiliusJM/kemono-fetcher
 echo  ==================================================
 echo.
 
@@ -112,7 +112,7 @@ if %errorlevel% neq 0 (
 echo  [Opcional] Nombre del ZIP de salida.
 echo   - Deja vacio para nombre automatico.
 echo   - Escribe NO si NO quieres ZIP (ya tienes las imagenes).
-echo   - Escribe el nombre: Ej.  Zenith Greyrat [XTRAS] (Patreon)
+echo   - O escribe el nombre: Ej.  Zenith Greyrat [XTRAS] (Patreon)
 echo.
 set CUSTOM_ZIP=
 set ZIP_NAME_ARG=
