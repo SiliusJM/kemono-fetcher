@@ -781,10 +781,11 @@ class Downloader:
     - Logs forenses: [DL] [THUMB] [VIDEO] [RETRY] [TIMEOUT] [FALLBACK] [FAIL]
     """
 
-    def __init__(self, img_dir: Path, net: NetworkAnalyzer, concurrency: int):
+    def __init__(self, img_dir: Path, net: NetworkAnalyzer, concurrency: int, post_id: str = ""):
         self.img_dir = img_dir
         self.net     = net
         self.sem     = asyncio.Semaphore(concurrency)
+        self.post_id = post_id
 
     async def download_all(
         self, items: List[MediaItem], session: aiohttp.ClientSession
@@ -831,7 +832,8 @@ class Downloader:
         prog,
         task,
     ) -> None:
-        fname = f"{idx + 1:04d}{item.ext}"
+        prefix = f"{self.post_id}-" if self.post_id else ""
+        fname = f"{prefix}{idx + 1}{item.ext}"
         fpath = self.img_dir / fname
         await self._download_one(item, fpath, session, prog, task, fname)
 
@@ -1135,7 +1137,7 @@ class ZipBuilder:
 
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
             for idx, item in enumerate(sorted(done, key=lambda x: x.dl_path.name)):
-                arcname = f"{idx + 1:04d}{item.ext}"
+                arcname = item.dl_path.name
                 zf.write(item.dl_path, arcname)
                 manifest["files"].append({
                     "name":       arcname,
@@ -1425,7 +1427,7 @@ async def _main(args: argparse.Namespace) -> None:
 
         # ── FASE 4: Descarga ──────────────────────────────────────────────────
         con.rule("[bold cyan]FASE 4 — Descarga[/bold cyan]")
-        dl = Downloader(img_dir, net, concurrency=args.concurrency)
+        dl = Downloader(img_dir, net, concurrency=args.concurrency, post_id=pid)
         await dl.download_all(items, session)
 
     # ── FASE 5: Exportar ──────────────────────────────────────────────────────
