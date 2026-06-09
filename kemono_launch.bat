@@ -108,30 +108,13 @@ if %errorlevel% neq 0 (
     echo.
 )
 
-:: ZIP - preguntar al usuario
-echo  [Opcional] ZIP de salida.
-echo   Enter       = sin ZIP (solo imagenes en carpeta)
-echo   nombre      = crea ZIP con ese nombre. Ej: Zenith Greyrat (Patreon)
-echo.
-set CUSTOM_ZIP=
-set ZIP_NAME_ARG=
-set NO_ZIP_ARG=
-set /p CUSTOM_ZIP="  Nombre del ZIP (Enter para omitir): "
-echo.
-
-if "!CUSTOM_ZIP!"=="" (
-    set NO_ZIP_ARG=--no-zip
-) else (
-    set ZIP_NAME_ARG=--zip-name "!CUSTOM_ZIP!"
-)
-
-:: Ejecutar
+:: Ejecutar (sin ZIP, solo carpeta de imágenes)
 echo.
 echo  Iniciando descarga...
 echo  URL: !POST_URL!
 echo.
 
-python kemono_galeria.py "!POST_URL!" !ZIP_NAME_ARG! !NO_ZIP_ARG!
+python kemono_galeria.py "!POST_URL!" --no-zip
 set EXIT_CODE=%errorlevel%
 
 echo.
@@ -141,27 +124,7 @@ if %EXIT_CODE% equ 0 (
     echo [WARN] El proceso termino con codigo %EXIT_CODE%. Revisa los mensajes anteriores.
 )
 
-:: Continuar o salir
-echo.
-echo  -------------------------------------------------------
-echo   Que deseas hacer?
-echo     Enter  -  Descargar otra URL
-echo     2      -  Salir
-echo  -------------------------------------------------------
-echo.
-set OPCION=
-set /p OPCION="  Opcion (Enter / 2): "
-
-if "!OPCION!"=="" goto LOOP
-if "!OPCION!"=="1" goto LOOP
-if "!OPCION!"=="2" goto FIN
-
-echo [WARN] Opcion invalida. Presiona Enter para continuar o 2 para salir.
-timeout /t 2 >nul
+:: Continuar - pedir nueva URL
 goto LOOP
 
-:FIN
-echo.
-echo  Hasta luego!
-echo.
 endlocal

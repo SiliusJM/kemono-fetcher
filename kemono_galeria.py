@@ -1446,10 +1446,10 @@ async def _main(args: argparse.Namespace) -> None:
     con.rule("[bold]FASE 7 — Veredicto[/bold]")
     print_verdict(items, net.results, post_title, zip_path, output_dir)
 
-    # ── Abrir carpeta de salida automáticamente (Windows) ─────────────────────
+    # ── Abrir carpeta images directamente (Windows) ───────────────────────────
     if sys.platform == "win32":
         try:
-            os.startfile(str(output_dir.resolve()))
+            os.startfile(str(img_dir.resolve()))
         except Exception:
             pass
 
